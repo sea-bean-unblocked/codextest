@@ -564,6 +564,31 @@
                                     <button class="btn btn-danger" onclick="window.factoryReset()"><i data-lucide="trash-2"></i> <span data-i18n="factory_reset">Factory Reset Browser</span></button>
                                 </div>
                             </div>
+                            <div class="settings-card">
+                                <div class="settings-card-header"><i data-lucide="rocket"></i> <span>Power Tools (20 quick features)</span></div>
+                                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
+                                    <button class="btn" onclick="window.storageStats()">Storage Stats</button>
+                                    <button class="btn" onclick="window.verifyStorageHealth()">Storage Health Check</button>
+                                    <button class="btn" onclick="window.compactHistory()">Compact History</button>
+                                    <button class="btn" onclick="window.trimHistoryToRecent()">Trim History (300)</button>
+                                    <button class="btn" onclick="window.dedupeBookmarks()">Deduplicate Bookmarks</button>
+                                    <button class="btn" onclick="window.sortBookmarksAZ()">Sort Bookmarks A→Z</button>
+                                    <button class="btn" onclick="window.removeInvalidBookmarks()">Remove Invalid Bookmarks</button>
+                                    <button class="btn" onclick="window.archiveCurrentSession()">Archive Current Session</button>
+                                    <button class="btn" onclick="window.restoreArchivedSession()">Restore Archived Session</button>
+                                    <button class="btn" onclick="window.clearSavedSessionOnly()">Clear Saved Session</button>
+                                    <button class="btn" onclick="window.pinAllTabsFeature()">Pin All Open Tabs</button>
+                                    <button class="btn" onclick="window.unpinAllTabsFeature()">Unpin All Tabs</button>
+                                    <button class="btn" onclick="window.closeSleepingTabsFeature()">Close Sleeping Tabs</button>
+                                    <button class="btn" onclick="window.openTopHistorySite()">Open Most Visited Site</button>
+                                    <button class="btn" onclick="window.openRandomBookmark()">Open Random Bookmark</button>
+                                    <button class="btn" onclick="window.copyBackupToClipboard()">Copy Backup JSON</button>
+                                    <button class="btn" onclick="window.importBackupFromClipboard()">Import Backup JSON</button>
+                                    <button class="btn" onclick="window.resetThemeOnly()">Reset Theme Only</button>
+                                    <button class="btn" onclick="window.resetStealthOnly()">Reset Stealth Only</button>
+                                    <button class="btn" onclick="window.clearBase64BackgroundOnly()">Clear Base64 Background</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -622,6 +647,23 @@
         function getFavicon(url) {
             try { const domain = new URL(url).hostname; return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`; } 
             catch { return ''; }
+        }
+        function safeJSONParse(value, fallback) {
+            try {
+                const parsed = JSON.parse(value);
+                return parsed ?? fallback;
+            } catch {
+                return fallback;
+            }
+        }
+        function safeLocalSet(key, value) {
+            try {
+                localStorage.setItem(key, value);
+                return true;
+            } catch (error) {
+                window.showToast('Storage is full. Clear old data to keep saving.', 'warning');
+                return false;
+            }
         }
 
         // --- TRANSLATION ENGINE ---
@@ -863,9 +905,9 @@
 
         let isLocked = localStorage.getItem('endis_pin_enabled') === 'true';
 
-        let browserHistory = JSON.parse(localStorage.getItem('endis_history')) || [];
-        let bookmarks = JSON.parse(localStorage.getItem('endis_bookmarks')) || [];
-        let customApps = JSON.parse(localStorage.getItem('endis_apps')) || [
+        let browserHistory = safeJSONParse(localStorage.getItem('endis_history'), []);
+        let bookmarks = safeJSONParse(localStorage.getItem('endis_bookmarks'), []);
+        let customApps = safeJSONParse(localStorage.getItem('endis_apps'), null) || [
             { name: 'YouTube', url: 'https://youtube.com', icon: 'https://www.google.com/s2/favicons?domain=youtube.com&sz=64' },
             { name: 'GitHub', url: 'https://github.com', icon: 'https://www.google.com/s2/favicons?domain=github.com&sz=64' },
             { name: 'Discord', url: 'https://discord.com/app', icon: 'https://www.google.com/s2/favicons?domain=discord.com&sz=64' },
@@ -894,7 +936,7 @@
             document.getElementById('hub-notes').value = localStorage.getItem('endis_notes') || '';
 
             if (startupBehavior === 'continue') {
-                let saved = JSON.parse(localStorage.getItem('endis_session') || '[]');
+                let saved = safeJSONParse(localStorage.getItem('endis_session'), []);
                 if (saved.length > 0) {
                     saved.forEach(s => {
                         const newId = WaveEngine.createSurface();
@@ -1244,12 +1286,12 @@
                     let finalUrl = url.startsWith('http') ? url : 'https://' + url;
                     let name = prompt("Enter shortcut name:") || new URL(finalUrl).hostname.replace('www.','');
                     customApps.push({name, url: finalUrl, icon: getFavicon(finalUrl)});
-                    localStorage.setItem('endis_apps', JSON.stringify(customApps)); renderHubApps();
+                    saveArrayToStorage('endis_apps', customApps); renderHubApps();
                 }
             };
             grid.appendChild(addBtn); lucide.createIcons();
         }
-        window.removeApp = function(index) { customApps.splice(index, 1); localStorage.setItem('endis_apps', JSON.stringify(customApps)); renderHubApps(); }
+        window.removeApp = function(index) { customApps.splice(index, 1); saveArrayToStorage('endis_apps', customApps); renderHubApps(); }
 
         // --- HISTORY, BOOKMARKS & DATA MGMT ---
         function addToHistory(url, title, isIncognito) {
@@ -1257,7 +1299,7 @@
             if (browserHistory.length > 0 && browserHistory[0].url === url) return;
             browserHistory.unshift({ url, title: title || new URL(url).hostname, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) });
             if(browserHistory.length > 100) browserHistory.pop();
-            localStorage.setItem('endis_history', JSON.stringify(browserHistory)); renderHistory();
+            saveArrayToStorage('endis_history', browserHistory); renderHistory();
         }
         function renderHistory(filter = '') {
             const l = document.getElementById('history-list'); l.innerHTML = '';
@@ -1282,7 +1324,7 @@
             const idx = bookmarks.findIndex(b => b.url === tab.url);
             if (idx > -1) { bookmarks.splice(idx, 1); window.showToast('Bookmark removed', 'info'); } 
             else { bookmarks.push({ url: tab.url, title: tab.title || new URL(tab.url).hostname, icon: getFavicon(tab.url) }); window.showToast('Bookmarked!', 'success'); }
-            localStorage.setItem('endis_bookmarks', JSON.stringify(bookmarks)); renderBookmarks(); updateUI();
+            saveArrayToStorage('endis_bookmarks', bookmarks); renderBookmarks(); updateUI();
         }
         function renderBookmarks(filter = '') {
             const l = document.getElementById('bookmarks-list'); l.innerHTML = '';
@@ -1296,7 +1338,7 @@
                 const e = document.createElement('div'); e.className = 'list-item';
                 e.innerHTML = `<div class="list-item-icon"><img src="${b.icon}" onerror="this.style.display='none'"></div>
                     <div class="list-item-details" onclick="window.loadUrl('${b.url}'); window.closeModal('bookmarks-modal');"><div class="list-title">${b.title}</div><div class="list-url">${b.url}</div></div>
-                    <div class="list-action" onclick="event.stopPropagation(); bookmarks.splice(${i},1); localStorage.setItem('endis_bookmarks', JSON.stringify(bookmarks)); renderBookmarks(); updateUI();"><i data-lucide="trash-2" style="width:16px;"></i></div>`;
+                    <div class="list-action" onclick="event.stopPropagation(); bookmarks.splice(${i},1); saveArrayToStorage('endis_bookmarks', bookmarks); renderBookmarks(); updateUI();"><i data-lucide="trash-2" style="width:16px;"></i></div>`;
                 l.appendChild(e);
             }); lucide.createIcons();
         }
@@ -1333,9 +1375,144 @@
             if(confirm("Are you sure? This will wipe all history, bookmarks, base64 images, apps, and settings.")) { localStorage.clear(); location.reload(); }
         }
 
+        function saveArrayToStorage(key, value) {
+            safeLocalSet(key, JSON.stringify(value));
+        }
+
+        window.storageStats = function() {
+            let bytes = 0;
+            const keyCount = localStorage.length;
+            for (let i = 0; i < keyCount; i++) {
+                const key = localStorage.key(i);
+                const val = localStorage.getItem(key) || '';
+                bytes += key.length + val.length;
+            }
+            const kb = (bytes / 1024).toFixed(2);
+            window.showToast(`Storage: ${keyCount} keys, ~${kb} KB used`, 'info');
+        }
+        window.verifyStorageHealth = function() {
+            const checks = [Array.isArray(browserHistory), Array.isArray(bookmarks), Array.isArray(customApps), typeof currentTheme === 'string'];
+            window.showToast(checks.every(Boolean) ? 'Storage health: good' : 'Storage health: repaired recommended (import/export)', checks.every(Boolean) ? 'success' : 'warning');
+        }
+        window.compactHistory = function() {
+            const seen = new Set();
+            browserHistory = browserHistory.filter(item => {
+                const key = `${item.url}|${item.title}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            saveArrayToStorage('endis_history', browserHistory); renderHistory();
+            window.showToast('History compacted', 'success');
+        }
+        window.trimHistoryToRecent = function(limit = 300) {
+            browserHistory = browserHistory.slice(0, limit);
+            saveArrayToStorage('endis_history', browserHistory); renderHistory();
+            window.showToast(`History trimmed to ${limit} entries`, 'success');
+        }
+        window.dedupeBookmarks = function() {
+            const seen = new Set();
+            bookmarks = bookmarks.filter(b => {
+                const key = (b.url || '').trim();
+                if (!key || seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            saveArrayToStorage('endis_bookmarks', bookmarks); renderBookmarks(); updateUI();
+            window.showToast('Bookmarks deduplicated', 'success');
+        }
+        window.sortBookmarksAZ = function() {
+            bookmarks.sort((a, b) => (a.title || a.url || '').localeCompare(b.title || b.url || ''));
+            saveArrayToStorage('endis_bookmarks', bookmarks); renderBookmarks();
+            window.showToast('Bookmarks sorted A→Z', 'success');
+        }
+        window.removeInvalidBookmarks = function() {
+            bookmarks = bookmarks.filter(b => /^https?:\/\//i.test(b.url || ''));
+            saveArrayToStorage('endis_bookmarks', bookmarks); renderBookmarks(); updateUI();
+            window.showToast('Invalid bookmarks removed', 'success');
+        }
+        window.archiveCurrentSession = function() {
+            const snapshot = tabs.filter(t => !t.incognito).map(t => ({ url: t.url, title: t.title, isRaw: t.isRaw }));
+            safeLocalSet('endis_session_archive', JSON.stringify({ savedAt: new Date().toISOString(), tabs: snapshot }));
+            window.showToast('Session archived', 'success');
+        }
+        window.restoreArchivedSession = function() {
+            const archive = safeJSONParse(localStorage.getItem('endis_session_archive'), null);
+            if (!archive || !Array.isArray(archive.tabs) || archive.tabs.length === 0) { window.showToast('No archived session found', 'warning'); return; }
+            tabs.slice().forEach(t => window.closeTab(t.id));
+            archive.tabs.forEach(t => { window.addTab(); if (t.url) window.loadUrl(t.url, !!t.isRaw); const cur = tabs.find(x => x.id === activeTabId); if (cur) cur.title = t.title || cur.title; });
+            updateUI();
+            window.showToast('Archived session restored', 'success');
+        }
+        window.clearSavedSessionOnly = function() {
+            localStorage.removeItem('endis_session');
+            window.showToast('Saved startup session cleared', 'success');
+        }
+        window.pinAllTabsFeature = function() { tabs.forEach(t => t.pinned = true); renderTabs(); saveSession(); window.showToast('All tabs pinned', 'success'); }
+        window.unpinAllTabsFeature = function() { tabs.forEach(t => t.pinned = false); renderTabs(); saveSession(); window.showToast('All tabs unpinned', 'success'); }
+        window.closeSleepingTabsFeature = function() {
+            const sleepy = tabs.filter(t => t.sleeping);
+            sleepy.forEach(t => window.closeTab(t.id));
+            window.showToast(sleepy.length ? `Closed ${sleepy.length} sleeping tabs` : 'No sleeping tabs to close', sleepy.length ? 'success' : 'info');
+        }
+        window.openTopHistorySite = function() {
+            if (!browserHistory.length) { window.showToast('History is empty', 'warning'); return; }
+            const counts = browserHistory.reduce((acc, item) => { const key = item.url; acc[key] = (acc[key] || 0) + 1; return acc; }, {});
+            const topUrl = Object.keys(counts).sort((a,b) => counts[b] - counts[a])[0];
+            window.loadUrl(topUrl);
+            window.showToast('Opened most visited URL', 'success');
+        }
+        window.openRandomBookmark = function() {
+            if (!bookmarks.length) { window.showToast('No bookmarks found', 'warning'); return; }
+            const pick = bookmarks[Math.floor(Math.random() * bookmarks.length)];
+            window.loadUrl(pick.url);
+            window.showToast('Opened random bookmark', 'success');
+        }
+        window.copyBackupToClipboard = async function() {
+            const data = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('endis_') || key.startsWith('sea')) data[key] = localStorage.getItem(key);
+            }
+            try { await navigator.clipboard.writeText(JSON.stringify(data)); window.showToast('Backup copied to clipboard', 'success'); }
+            catch { window.showToast('Clipboard copy blocked by browser', 'error'); }
+        }
+        window.importBackupFromClipboard = async function() {
+            try {
+                const raw = await navigator.clipboard.readText();
+                const data = safeJSONParse(raw, null);
+                if (!data || typeof data !== 'object') { window.showToast('Clipboard does not contain valid JSON backup', 'error'); return; }
+                Object.keys(data).forEach(key => { if (key.startsWith('endis_') || key.startsWith('sea')) safeLocalSet(key, data[key]); });
+                window.showToast('Clipboard backup imported. Reloading...', 'success');
+                setTimeout(() => location.reload(), 1200);
+            } catch {
+                window.showToast('Clipboard read blocked by browser', 'error');
+            }
+        }
+        window.resetThemeOnly = function() {
+            ['endis_theme', 'endis_bg_id', 'endis_custom_bg', 'endis_custom_hex'].forEach(k => localStorage.removeItem(k));
+            window.showToast('Theme settings reset. Reloading...', 'success');
+            setTimeout(() => location.reload(), 800);
+        }
+        window.resetStealthOnly = function() {
+            ['seaHotkey', 'seaPanicUrl', 'seaAntiClose', 'seaCloak', 'seaClearOnExit'].forEach(k => localStorage.removeItem(k));
+            window.showToast('Stealth settings reset. Reloading...', 'success');
+            setTimeout(() => location.reload(), 800);
+        }
+        window.clearBase64BackgroundOnly = function() {
+            const bg = localStorage.getItem('endis_custom_bg') || '';
+            if (bg.startsWith('data:image/')) {
+                localStorage.removeItem('endis_custom_bg');
+                if (localStorage.getItem('endis_bg_id') === 'custom') localStorage.setItem('endis_bg_id', 'none');
+                window.showToast('Base64 background cleared', 'success');
+            } else {
+                window.showToast('No base64 background found', 'info');
+            }
+        }
+
         function saveSession() {
             const sessionTabs = tabs.filter(t => !t.incognito);
-            localStorage.setItem('endis_session', JSON.stringify(sessionTabs));
+            saveArrayToStorage('endis_session', sessionTabs);
         }
 
         // --- WAVE IFRAME ENGINE (MOCK) ---
@@ -1344,7 +1521,13 @@
             createSurface: () => { const id = 'tab-' + Date.now() + Math.floor(Math.random()*1000); const f = document.createElement('iframe'); f.id = 'frame-' + id; f.className = 'fallback-frame'; canvasContainer.appendChild(f); return id; },
             switchSurface: (id) => { document.querySelectorAll('.fallback-frame').forEach(f => f.style.display = 'none'); const f = document.getElementById('frame-' + id); if(f) f.style.display = 'block'; },
             closeSurface: (id) => { const f = document.getElementById('frame-' + id); if(f) f.remove(); },
-            navigate: (id, url, isRaw) => { const f = document.getElementById('frame-' + id); if(f && url) f.src = (isRaw || url === '/select') ? url : '/wave#' + url; },
+            navigate: (id, url, isRaw) => {
+                const f = document.getElementById('frame-' + id);
+                if (f && url) {
+                    const chatUrl = window.location.origin + '/chat#' + String(url);
+                    f.src = (isRaw || url === '/select') ? url : chatUrl;
+                }
+            },
             reload: (id) => { const f = document.getElementById('frame-' + id); if(f) f.src = f.src; }
         };
 
