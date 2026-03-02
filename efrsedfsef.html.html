@@ -1344,7 +1344,7 @@
             createSurface: () => { const id = 'tab-' + Date.now() + Math.floor(Math.random()*1000); const f = document.createElement('iframe'); f.id = 'frame-' + id; f.className = 'fallback-frame'; canvasContainer.appendChild(f); return id; },
             switchSurface: (id) => { document.querySelectorAll('.fallback-frame').forEach(f => f.style.display = 'none'); const f = document.getElementById('frame-' + id); if(f) f.style.display = 'block'; },
             closeSurface: (id) => { const f = document.getElementById('frame-' + id); if(f) f.remove(); },
-            navigate: (id, url, isRaw) => { const f = document.getElementById('frame-' + id); if(f && url) f.src = (isRaw || url === '/select') ? url : '/wave#' + url; },
+            navigate: (id, url, isRaw) => { const f = document.getElementById('frame-' + id); if(f && url) f.src = (isRaw || url === '/select') ? url : '/chat#' + url; },
             reload: (id) => { const f = document.getElementById('frame-' + id); if(f) f.src = f.src; }
         };
 
