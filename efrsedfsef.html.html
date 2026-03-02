@@ -1347,8 +1347,8 @@
             navigate: (id, url, isRaw) => {
                 const f = document.getElementById('frame-' + id);
                 if (f && url) {
-                    const chatTarget = String(url).replace(/^[\/#]+/, '');
-                    f.src = (isRaw || url === '/select') ? url : '/chat#' + chatTarget;
+                    const chatUrl = window.location.origin + '/chat#' + String(url);
+                    f.src = (isRaw || url === '/select') ? url : chatUrl;
                 }
             },
             reload: (id) => { const f = document.getElementById('frame-' + id); if(f) f.src = f.src; }
