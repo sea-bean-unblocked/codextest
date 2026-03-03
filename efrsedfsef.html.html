@@ -57,6 +57,8 @@
         body.focus-mode .browser-header { position: absolute; width: 100%; top: -110px; z-index: 1000; }
         body.focus-mode .browser-header:hover { top: 0; }
         body.focus-mode .viewport { height: 100vh; }
+        body.split-active .browser-header { position: relative !important; width: auto !important; top: 0 !important; }
+        body.split-active .viewport { height: auto !important; }
 
         .tab-bar { display: flex; align-items: flex-end; height: 46px; padding: 0 15px; gap: 8px; padding-top: 10px; background: rgba(0,0,0,0.3); }
         #tab-list { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; padding-bottom: 2px;}
@@ -952,6 +954,14 @@
         let contextTargetTabId = null;
         let splitView = { enabled: false, leftId: null, rightId: null };
 
+        function setSplitViewState(enabled, leftId = null, rightId = null) {
+            splitView = { enabled, leftId, rightId };
+            document.body.classList.toggle('split-active', !!enabled);
+            if (enabled && document.body.classList.contains('focus-mode')) {
+                document.body.classList.remove('focus-mode');
+            }
+        }
+
         // --- INIT ---
         function initBrowser() {
             lucide.createIcons();
@@ -1589,7 +1599,7 @@
                 WaveEngine.navigate(t.id, t.url, t.isRaw); // Wake up
             }
             activeTabId = id;
-            if (splitView.enabled && id !== splitView.leftId && id !== splitView.rightId) splitView = { enabled: false, leftId: null, rightId: null };
+            if (splitView.enabled && id !== splitView.leftId && id !== splitView.rightId) setSplitViewState(false);
             updateUI();
         }
 
@@ -1599,7 +1609,7 @@
             if(idx > -1 && !tabs[idx].incognito) closedTabsHistory.push({...tabs[idx]});
 
             tabs.splice(idx, 1); WaveEngine.closeSurface(id);
-            if (splitView.enabled && (splitView.leftId === id || splitView.rightId === id)) splitView = { enabled: false, leftId: null, rightId: null };
+            if (splitView.enabled && (splitView.leftId === id || splitView.rightId === id)) setSplitViewState(false);
 
             if (tabs.length === 0) { window.addTab(); return; }
             if (activeTabId === id) window.switchTab(tabs[idx > 0 ? idx - 1 : 0].id); else updateUI();
@@ -1647,14 +1657,14 @@
                 window.showToast('Open two real pages before splitting tabs.', 'warning');
                 return;
             }
-            splitView = { enabled: true, leftId, rightId };
+            setSplitViewState(true, leftId, rightId);
             activeTabId = leftId;
             updateUI();
             window.showToast('Split view enabled', 'success');
         }
 
         window.disableSplitView = function() {
-            splitView = { enabled: false, leftId: null, rightId: null };
+            setSplitViewState(false);
             updateUI();
             window.showToast('Split view closed', 'info');
         }
@@ -1711,7 +1721,7 @@
                     splitMeta.textContent = `${leftTab.title || leftTab.url}  |  ${rightTab.title || rightTab.url}`;
                 } else {
                     splitBanner.style.display = 'none';
-                    splitView = { enabled: false, leftId: null, rightId: null };
+                    setSplitViewState(false);
                 }
                 document.querySelectorAll('.fallback-frame').forEach(f => {
                     f.style.position = 'absolute'; f.style.top = '0'; f.style.bottom = '0'; f.style.height = '100%';
